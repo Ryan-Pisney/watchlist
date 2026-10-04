@@ -44,6 +44,15 @@
   @media(max-width:560px){.box{flex-direction:column}.box .poster{width:100%;flex:none;aspect-ratio:2/3}}
 </style>
 <base target="_blank">
+<meta name="theme-color" content="#0d0e12">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Watchlist">
+
 </head>
 <body>
 <header>
@@ -314,5 +323,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')modal.classList.remo
 q.oninput=render;sortSel.onchange=render;
 initChips();render();
 </script>
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));</script>
 </body>
 </html>
