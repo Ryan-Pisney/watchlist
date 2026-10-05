@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jenny and Ryan — Watchlist</title>
+<title>cousalacous — Watchlist</title>
 <style>
   :root{--bg:#0d0e12;--panel:#16181f;--panel2:#1d2029;--txt:#e8eaf0;--dim:#9aa0ad;--acc:#00e054;--line:#262a35}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -63,6 +63,19 @@
   #aErr{color:#ff6b6b;font-size:13px;min-height:1.2em;margin-top:8px}
   #cfgb{display:none;background:#2a2110;border:1px solid #6b5518;color:#e8c56b;font-size:13px;padding:10px 20px}
   .rm{display:inline-block;background:none;border:1px solid #5a2b2b;color:#ff8585;font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;margin-top:10px;margin-left:8px}
+  #histBtn{display:none;background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:8px 12px;font-size:14px;cursor:pointer}
+  #histBtn:hover{border-color:var(--acc);color:var(--txt)}
+  #actP{position:fixed;top:0;right:0;bottom:0;width:min(340px,92vw);background:var(--panel);border-left:1px solid var(--line);z-index:70;transform:translateX(105%);transition:transform .22s ease;display:flex;flex-direction:column}
+  #actP.open{transform:none}
+  .actH{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);font-weight:700}
+  .actH button{background:none;border:none;color:var(--dim);font-size:22px;cursor:pointer}
+  #actL{overflow:auto;padding:10px 16px;flex:1}
+  .act{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .act:last-child{border-bottom:none}
+  .act .ic{font-weight:700;width:14px}
+  .act .plus{color:var(--acc)}
+  .act .minus{color:#ff8585}
+  .act .when{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap;padding-left:8px}
 </style>
 <base target="_blank">
 <meta name="theme-color" content="#0d0e12">
@@ -77,7 +90,7 @@
 </head>
 <body>
 <header>
-  <h1><span>&#9654;</span> Jenny and Ryan's Watchlist <span id="count"></span></h1>
+  <h1><span>&#9654;</span> cousalacous watchlist <span id="count"></span></h1>
   <div class="controls">
     <input type="search" id="q" placeholder="Search titles…">
     <select id="sort">
@@ -90,6 +103,7 @@
       <option value="large">Big cards</option>
       <option value="compact">Small cards</option>
     </select>
+    <button id="histBtn" title="Recent activity">History</button>
   </div>
 </header>
 <div id="cfgb"></div>
@@ -98,6 +112,7 @@
 <footer>Posters stream from Wikipedia as you scroll (internet required). Blurbs &amp; filters work offline.</footer>
 <button id="fab" title="Add a movie">+</button>
 <div id="addM"><div class="abox"><h3>Add a movie</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
+<div id="actP"><div class="actH"><span>Recent activity</span><button id="actX">&times;</button></div><div id="actL"></div></div>
 <div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><p id="mBlurb"></p><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -182,7 +197,7 @@ function openModal(i,card){
   document.getElementById('mBlurb').textContent=m[4]||'No synopsis available yet.';
   document.getElementById('mLb').href=m[5].includes('/')?m[5]:'https://boxd.it/'+m[5];
   const mRm=document.getElementById('mRm');
-  if(DB){mRm.style.display='inline-block';mRm.onclick=()=>{if(m.k)DB.ref('movies/'+m.k).remove();modal.classList.remove('open');};}
+  if(DB){mRm.style.display='inline-block';mRm.onclick=()=>{if(m.k)DB.ref('movies/'+m.k).remove();logAct('del',m[0],m[1]);modal.classList.remove('open');};}
   else mRm.style.display='none';
   const mp=document.getElementById('mPoster');
   const img=card.querySelector('img');
@@ -240,17 +255,47 @@ aGo.onclick=()=>{
   if(!t){aErr.textContent='A title is required.';return;}
   const y=parseInt(aY.value,10)||'';
   DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10)});
+  logAct('add',t,y);
   aT.value='';aY.value='';aErr.textContent='';aClose();
 };
+let ACT=[];
+function logAct(a,t,y){
+  if(!DB)return;
+  DB.ref('activity').push({a:a,t:t,y:y,ts:firebase.database.ServerValue.TIMESTAMP}).then(()=>{
+    DB.ref('activity').once('value',s=>{
+      const v=s.val()||{};
+      const ks=Object.keys(v).sort((x,z)=>(v[x].ts||0)-(v[z].ts||0));
+      if(ks.length>100){const drop={};ks.slice(0,ks.length-100).forEach(k=>drop[k]=null);DB.ref('activity').update(drop);}
+    });
+  });
+}
+const histBtn=document.getElementById('histBtn'),actP=document.getElementById('actP'),
+      actL=document.getElementById('actL'),actX=document.getElementById('actX');
+function renderAct(){
+  actL.innerHTML='';
+  if(!ACT.length){actL.innerHTML='<div class="act" style="color:var(--dim)">No activity yet.</div>';return;}
+  for(const e of ACT){
+    const row=document.createElement('div');row.className='act';
+    const ic=document.createElement('span');ic.className='ic '+(e.a==='add'?'plus':'minus');ic.textContent=e.a==='add'?'+':'−';
+    const ti=document.createElement('span');ti.textContent=e.t+(e.y?' ('+e.y+')':'');
+    const wh=document.createElement('span');wh.className='when';
+    wh.textContent=e.ts?new Date(e.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+    row.append(ic,ti,wh);actL.appendChild(row);
+  }
+}
+histBtn.onclick=()=>{renderAct();actP.classList.add('open');};
+actX.onclick=()=>actP.classList.remove('open');
 initChips();
 if(FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.apiKey!=='PASTE_API_KEY_HERE'){
   firebase.initializeApp(FIREBASE_CONFIG);
   DB=firebase.database();
   fab.style.display='flex';
+  histBtn.style.display='block';
   DB.ref('movies').on('value',s=>{setBanner('');applySnap(s.val()||{});},()=>{
     if(!loadLocal())render();
     setBanner('Could not reach the database — showing the last saved copy.');
   });
+  DB.ref('activity').on('value',s=>{const v=s.val()||{};ACT=Object.values(v).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,50);});
   seedIfRequested();
 }else{
   if(!loadLocal())render();
