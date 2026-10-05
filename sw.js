@@ -1,5 +1,6 @@
-const CACHE = 'watchlist-v1';
-const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
+const CACHE = 'watchlist-v2';
+const SHELL = ['./index.html', './manifest.json', './config.js', './posters.js', './seed.js',
+               './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -18,7 +19,6 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   if (url.origin !== location.origin) {
-    // Wikipedia posters etc.: cache after first successful load so they work offline too
     e.respondWith(
       caches.match(e.request).then(hit =>
         hit ||
@@ -35,7 +35,6 @@ self.addEventListener('fetch', e => {
   }
 
   if (e.request.mode === 'navigate') {
-    // pages: network first (so updates show up), cache as fallback when offline
     e.respondWith(
       fetch(e.request)
         .then(res => {
@@ -46,7 +45,6 @@ self.addEventListener('fetch', e => {
         .catch(() => caches.match(e.request).then(m => m || caches.match('./index.html')))
     );
   } else {
-    // app files: cache first, network fallback
     e.respondWith(
       caches.match(e.request).then(
         hit =>
