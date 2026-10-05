@@ -127,13 +127,13 @@ let M=[];
 
 const grid=document.getElementById('grid'),chipsEl=document.getElementById('chips'),q=document.getElementById('q'),sortSel=document.getElementById('sort');
 let activeGenres=new Set();
-const genres=[...new Set(M.flatMap(m=>m[3]))].sort();
 const art=t=>t.replace(/^(the|a|an)\s+/i,'');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hue=t=>{let h=0;for(const c of t)h=(h*31+c.charCodeAt(0))%360;return h};
 
 function initChips(){
   chipsEl.innerHTML='';
+  const genres=[...new Set(M.flatMap(m=>m[3]))].sort();
   const all=document.createElement('span');all.className='chip on';all.textContent='All';all.onclick=()=>{activeGenres.clear();document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));all.classList.add('on');render()};
   chipsEl.appendChild(all);
   genres.forEach(g=>{
