@@ -144,7 +144,7 @@ function initChips(){
 }
 function visible(){
   const term=q.value.trim().toLowerCase();
-  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeGenres.size||m[3].some(g=>activeGenres.has(g))));
+  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeGenres.size||[...activeGenres].every(g=>m[3].includes(g))));
 }
 function sorted(list){
   const s=sortSel.value;
