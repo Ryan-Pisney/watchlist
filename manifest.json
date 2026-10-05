@@ -1,6 +1,6 @@
 {
-  "name": "cousalacous watchlist",
-  "short_name": "Watchlist",
+  "name": "Jenny and Ryan's Watchlist",
+  "short_name": "J-&-R Watchlist",
   "description": "Personal movie watchlist",
   "start_url": "./index.html",
   "scope": "./",
