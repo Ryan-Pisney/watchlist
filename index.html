@@ -246,8 +246,8 @@ async function enrichWatch(m){
         const pr=await (await fetch('https://api.themoviedb.org/3/movie/'+f.id+'/watch/providers?api_key='+key)).json();
         const us=(pr.results&&pr.results.US)||{};
         const flat=(us.flatrate||us.ads||[]).map(x=>x.provider_name);
-        m.p={id:f.id,flat:flat};
-      }else m.p='none';
+        m.p={id:f.id,flat:flat,ts:Date.now()};
+      }else m.p={none:true,ts:Date.now()};
       DB.ref('movies/'+m.k+'/p').set(m.p);
     }catch(e){}
   }
@@ -275,7 +275,8 @@ function openModal(i,card){
   renderWatch(m);
   if(DB&&m.k){const key=(typeof TMDB_API_KEY!=='undefined')?TMDB_API_KEY:'';
     const canTmdb=key&&key!=='PASTE_TMDB_KEY_HERE';
-    if((m[1]&&m[1]<1960&&m.ia===undefined)||(canTmdb&&m.p===undefined))enrichWatch(m);}
+    const stale=m.p&&m.p.ts&&(Date.now()-m.p.ts>14*24*60*60*1000);
+    if((m[1]&&m[1]<1960&&m.ia===undefined)||(canTmdb&&(!m.p||stale)))enrichWatch(m);}
   modal.classList.add('open');
 }
 document.getElementById('x').onclick=()=>modal.classList.remove('open');
