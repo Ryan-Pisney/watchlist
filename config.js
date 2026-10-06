@@ -15,3 +15,8 @@ const WHO_OPTIONS = [
   { name: "Jenny", color: "#ff9933" },   // orange
   { name: "Ryan",  color: "#a06bff" }    // purple
 ];
+
+// Optional: TMDB (themoviedb.org) API key — enables "available on Netflix/Prime/..." chips.
+// Free: themoviedb.org → sign up → Settings → API → Request API key (Developer, v3).
+// Leave as-is and the app still works (Watch button uses JustWatch; chips just won't appear).
+const TMDB_API_KEY = "PASTE_TMDB_KEY_HERE";
