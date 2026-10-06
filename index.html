@@ -253,11 +253,11 @@ async function enrichWatch(m){
         if(!r2.ok)throw new Error('TMDB providers HTTP '+r2.status);
         const pr=await r2.json();
         const us=(pr.results&&pr.results.US)||{};
-        const flat=(us.flatrate||us.ads||[]).map(x=>x.provider_name);
+        const flat=[...new Set([...(us.flatrate||[]),...(us.ads||[])].map(x=>x.provider_name))];
         m.p={id:f.id,flat:flat,ts:Date.now()};
       }else m.p={none:true,ts:Date.now()};
       DB.ref('movies/'+m.k+'/p').set(m.p);
-      watchStatus('');
+      watchStatus(m.p.flat&&m.p.flat.length?'':'Found on TMDB — not on subscription streaming right now (rent/buy only)');
     }catch(err){watchStatus('Lookup failed: '+((err&&err.message)||err)+' — tell Kimi this exact text');}
   }
   renderWatch(m);
