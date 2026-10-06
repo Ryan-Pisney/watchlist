@@ -19,6 +19,7 @@
   #chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px 0}
   .chip{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;user-select:none}
   .chip.on{background:var(--acc);border-color:var(--acc);color:#06240f;font-weight:600}
+  .chip.who.on{background:transparent;font-weight:700;box-shadow:inset 0 0 0 1.5px currentColor}
   #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;padding:18px 20px 60px}
   .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .18s ease,border-color .18s ease}
   .card:hover{transform:translateY(-4px);border-color:#3a4152}
@@ -136,6 +137,7 @@ let M=[];
 
 const grid=document.getElementById('grid'),chipsEl=document.getElementById('chips'),q=document.getElementById('q'),sortSel=document.getElementById('sort');
 let activeGenres=new Set();
+let activeActor=null;
 const art=t=>t.replace(/^(the|a|an)\s+/i,'');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hue=t=>{let h=0;for(const c of t)h=(h*31+c.charCodeAt(0))%360;return h};
@@ -143,8 +145,19 @@ const hue=t=>{let h=0;for(const c of t)h=(h*31+c.charCodeAt(0))%360;return h};
 function initChips(){
   chipsEl.innerHTML='';
   const genres=[...new Set(M.flatMap(m=>m[3]))].sort();
-  const all=document.createElement('span');all.className='chip on';all.textContent='All';all.onclick=()=>{activeGenres.clear();document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));all.classList.add('on');render()};
+  const all=document.createElement('span');all.className='chip on';all.textContent='All';all.onclick=()=>{activeGenres.clear();activeActor=null;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));all.classList.add('on');render()};
   chipsEl.appendChild(all);
+  if(M.some(m=>m.by))(typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).forEach(o=>{
+    const c=document.createElement('span');c.className='chip who';c.textContent=o.name;
+    c.style.borderColor=o.color;c.style.color=o.color;
+    if(activeActor===o.name)c.classList.add('on');
+    c.onclick=()=>{activeActor=(activeActor===o.name)?null:o.name;
+      document.querySelectorAll('.chip.who').forEach(x=>x.classList.remove('on'));
+      if(activeActor)c.classList.add('on');
+      all.classList.toggle('on',!activeGenres.size&&!activeActor);
+      render()};
+    chipsEl.appendChild(c);
+  });
   genres.forEach(g=>{
     const c=document.createElement('span');c.className='chip';c.textContent=g;
     c.onclick=()=>{if(activeGenres.has(g)){activeGenres.delete(g);c.classList.remove('on')}else{activeGenres.add(g);c.classList.add('on');all.classList.remove('on')}if(!activeGenres.size)all.classList.add('on');render()};
@@ -153,7 +166,7 @@ function initChips(){
 }
 function visible(){
   const term=q.value.trim().toLowerCase();
-  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeGenres.size||[...activeGenres].every(g=>m[3].includes(g))));
+  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeActor||m.by===activeActor)&&(!activeGenres.size||[...activeGenres].every(g=>m[3].includes(g))));
 }
 function sorted(list){
   const s=sortSel.value;
