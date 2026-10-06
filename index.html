@@ -131,6 +131,7 @@
 <script src="seed.js"></script>
 <script>
 // movies now load from Firebase; row shape: [title, year, wiki, [genres], blurb, letterboxd, date, poster]
+window.addEventListener('error',e=>{try{const b=document.getElementById('cfgb');b.textContent='Something broke: '+(e.message||e.type)+' (line '+(e.lineno||'?')+') — tell Kimi this exact message.';b.style.display='block';}catch(_){}});
 let M=[];
 
 const grid=document.getElementById('grid'),chipsEl=document.getElementById('chips'),q=document.getElementById('q'),sortSel=document.getElementById('sort');
@@ -234,11 +235,13 @@ const cfgb=document.getElementById('cfgb');
 function setBanner(msg){cfgb.textContent=msg;cfgb.style.display=msg?'block':'none';}
 function mergePoster(r){const k=r[0]+'|'+r[1];if(EMBED[k])r[7]=EMBED[k];return r;}
 function applySnap(v){
+ try{
   const rows=[];
   for(const k in v){const n=v[k];const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';rows.push(r);}
   M=rows.map(mergePoster);
   try{localStorage.setItem('wl-cache',JSON.stringify(M.map(r=>({t:r[0],y:r[1],w:r[2],g:r[3],b:r[4],l:r[5],d:r[6]}))));}catch(e){}
   initChips();render();
+ }catch(err){setBanner('Data load error: '+(err&&err.message?err.message:err)+' — tell Kimi this.');}
 }
 function loadLocal(){
   try{
@@ -303,8 +306,10 @@ const whoM=document.getElementById('whoM'),whoChip=document.getElementById('whoC
 function whoColor(n){const o=(typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).find(o=>o.name===n);return o?o.color:''}
 function renderWho(){
   if(WHO){whoChip.style.display='inline-flex';whoChip.textContent=WHO;
-    const c=whoColor(WHO);whoChip.style.borderColor=c||'var(--line)';whoChip.style.color=c||'var(--dim)';}
-  else whoChip.style.display='none';
+    const c=whoColor(WHO);whoChip.style.borderColor=c||'var(--line)';whoChip.style.color=c||'var(--dim)';
+    whoM.classList.remove('open');}
+  else{whoChip.style.display='none';
+    if((typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).length)whoM.classList.add('open');}
 }
 function setWho(n){WHO=n;try{localStorage.setItem('wl-who',n)}catch(e){}renderWho();whoM.classList.remove('open');}
 whoChip.onclick=()=>whoM.classList.add('open');
