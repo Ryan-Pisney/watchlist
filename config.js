@@ -19,4 +19,4 @@ const WHO_OPTIONS = [
 // Optional: TMDB (themoviedb.org) API key — enables "available on Netflix/Prime/..." chips.
 // Free: themoviedb.org → sign up → Settings → API → Request API key (Developer, v3).
 // Leave as-is and the app still works (Watch button uses JustWatch; chips just won't appear).
-const TMDB_API_KEY = "61d1889374ec7d216da43046aa3b14d0";
+const TMDB_API_KEY = "61d1809374ec7d216da43046aa3b14d0";
