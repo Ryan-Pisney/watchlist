@@ -236,17 +236,19 @@ function setBanner(msg){cfgb.textContent=msg;cfgb.style.display=msg?'block':'non
 function mergePoster(r){const k=r[0]+'|'+r[1];if(EMBED[k])r[7]=EMBED[k];return r;}
 function applySnap(v){
  try{
-  const rows=[];
-  for(const k in v){const n=v[k];const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';rows.push(r);}
+  const rows=[];let skipped=0;
+  for(const k in v){const n=v[k];if(!n||typeof n.t!=='string'||!n.t.trim()){skipped++;continue;}
+    const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';rows.push(r);}
   M=rows.map(mergePoster);
   try{localStorage.setItem('wl-cache',JSON.stringify(M.map(r=>({t:r[0],y:r[1],w:r[2],g:r[3],b:r[4],l:r[5],d:r[6]}))));}catch(e){}
   initChips();render();
+  if(skipped)setBanner('Note: skipped '+skipped+' malformed entr'+(skipped>1?'ies':'y')+' — ask Kimi for the cleanup snippet.');
  }catch(err){setBanner('Data load error: '+(err&&err.message?err.message:err)+' — tell Kimi this.');}
 }
 function loadLocal(){
   try{
     const s=localStorage.getItem('wl-cache');if(!s)return false;
-    const rows=JSON.parse(s).map(n=>{const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];return mergePoster(r);});
+    const rows=JSON.parse(s).filter(n=>n&&typeof n.t==='string'&&n.t.trim()).map(n=>{const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];return mergePoster(r);});
     if(!rows.length)return false;
     M=rows;initChips();render();return true;
   }catch(e){return false;}
