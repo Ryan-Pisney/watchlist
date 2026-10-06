@@ -9,3 +9,9 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "193985835722",
   appId: "1:193985835722:web:031f3814c3bbe28df2ba33"
 };
+
+// Who uses the watchlist (identity picker + card border colors). Edit freely.
+const WHO_OPTIONS = [
+  { name: "Jenny", color: "#ff9933" },   // orange
+  { name: "Ryan",  color: "#a06bff" }    // purple
+];

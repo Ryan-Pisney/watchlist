@@ -77,6 +77,12 @@
   .act .plus{color:var(--acc)}
   .act .minus{color:#ff8585}
   .act .when{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap;padding-left:8px}
+  #whoM{position:fixed;inset:0;z-index:65;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:20px}
+  #whoM.open{display:flex}
+  #whoOpts{display:flex;gap:10px}
+  #whoOpts button{flex:1;background:var(--panel2);border:2px solid var(--line);border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
+  #whoOpts button:hover{background:var(--panel)}
+  #whoChip{display:none;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer}
 </style>
 <base target="_blank">
 <meta name="theme-color" content="#0d0e12">
@@ -105,6 +111,7 @@
       <option value="compact">Small cards</option>
     </select>
     <button id="histBtn" title="Recent activity">History</button>
+    <button id="whoChip" title="Switch user"></button>
   </div>
 </header>
 <div id="cfgb"></div>
@@ -114,7 +121,8 @@
 <button id="fab" title="Add a movie">+</button>
 <div id="addM"><div class="abox"><h3>Add a movie</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
 <div id="actP"><div class="actH"><span>Recent activity</span><button id="actX">&times;</button></div><div id="actL"></div></div>
-<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><p id="mBlurb"></p><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
+<div id="whoM"><div class="abox"><h3>Who's watching?</h3><div id="whoOpts"></div></div></div>
+<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -184,6 +192,8 @@ function render(){
     const card=document.createElement('div');card.className='card';card.dataset.i=i;
     const initials=m[0].split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
     card.innerHTML=`<div class="poster" style="background:linear-gradient(145deg,hsl(${hue(m[0])} 45% 30%),hsl(${(hue(m[0])+50)%360} 55% 14%))"><div class="ph">${initials}</div><img alt="" loading="lazy"></div><div class="meta"><h3>${esc(m[0])}</h3><div class="y">${m[1]}</div><div class="tags">${m[3].map(g=>`<span class="tag">${esc(g)}</span>`).join('')}</div></div>`;
+    const wc=whoColor(m.by);
+    if(wc){card.style.borderColor=wc;card.style.boxShadow='0 0 12px -5px '+wc;}
     card.onclick=()=>openModal(i,card);
     grid.appendChild(card);
     io.observe(card);
@@ -195,6 +205,9 @@ function openModal(i,card){
   document.getElementById('mTitle').textContent=m[0];
   document.getElementById('mYear').textContent=(m[1]?m[1]+' · ':'')+(m[6]?'added '+m[6]:'');
   document.getElementById('mTags').innerHTML=m[3].map(g=>`<span class="tag">${esc(g)}</span>`).join('');
+  const mBy=document.getElementById('mBy'),mc=whoColor(m.by);
+  mBy.textContent=m.by?('Added by '+m.by):'';
+  mBy.style.color=mc||'var(--dim)';
   document.getElementById('mBlurb').textContent=m[4]||'No synopsis available yet.';
   document.getElementById('mLb').href=m[5].includes('/')?m[5]:'https://boxd.it/'+m[5];
   const mRm=document.getElementById('mRm');
@@ -222,7 +235,7 @@ function setBanner(msg){cfgb.textContent=msg;cfgb.style.display=msg?'block':'non
 function mergePoster(r){const k=r[0]+'|'+r[1];if(EMBED[k])r[7]=EMBED[k];return r;}
 function applySnap(v){
   const rows=[];
-  for(const k in v){const n=v[k];const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;rows.push(r);}
+  for(const k in v){const n=v[k];const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';rows.push(r);}
   M=rows.map(mergePoster);
   try{localStorage.setItem('wl-cache',JSON.stringify(M.map(r=>({t:r[0],y:r[1],w:r[2],g:r[3],b:r[4],l:r[5],d:r[6]}))));}catch(e){}
   initChips();render();
@@ -255,14 +268,14 @@ aGo.onclick=()=>{
   const t=aT.value.trim();
   if(!t){aErr.textContent='A title is required.';return;}
   const y=parseInt(aY.value,10)||'';
-  DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10)});
+  DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10),by:WHO||''});
   logAct('add',t,y);
   aT.value='';aY.value='';aErr.textContent='';aClose();
 };
 let ACT=[];
 function logAct(a,t,y){
   if(!DB)return;
-  DB.ref('activity').push({a:a,t:t,y:y,ts:firebase.database.ServerValue.TIMESTAMP}).then(()=>{
+  DB.ref('activity').push({a:a,t:t,y:y,actor:WHO||'',ts:firebase.database.ServerValue.TIMESTAMP}).then(()=>{
     DB.ref('activity').once('value',s=>{
       const v=s.val()||{};
       const ks=Object.keys(v).sort((x,z)=>(v[x].ts||0)-(v[z].ts||0));
@@ -279,11 +292,27 @@ function renderAct(){
     const row=document.createElement('div');row.className='act';
     const ic=document.createElement('span');ic.className='ic '+(e.a==='add'?'plus':'minus');ic.textContent=e.a==='add'?'+':'−';
     const ti=document.createElement('span');ti.textContent=e.t+(e.y?' ('+e.y+')':'');
+    if(e.actor){const ac=document.createElement('span');ac.textContent=' · '+e.actor;ac.style.color=whoColor(e.actor)||'var(--dim)';ti.appendChild(ac);}
     const wh=document.createElement('span');wh.className='when';
     wh.textContent=e.ts?new Date(e.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
     row.append(ic,ti,wh);actL.appendChild(row);
   }
 }
+let WHO=null;try{WHO=localStorage.getItem('wl-who')}catch(e){}
+const whoM=document.getElementById('whoM'),whoChip=document.getElementById('whoChip'),whoOpts=document.getElementById('whoOpts');
+function whoColor(n){const o=(typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).find(o=>o.name===n);return o?o.color:''}
+function renderWho(){
+  if(WHO){whoChip.style.display='inline-flex';whoChip.textContent=WHO;
+    const c=whoColor(WHO);whoChip.style.borderColor=c||'var(--line)';whoChip.style.color=c||'var(--dim)';}
+  else whoChip.style.display='none';
+}
+function setWho(n){WHO=n;try{localStorage.setItem('wl-who',n)}catch(e){}renderWho();whoM.classList.remove('open');}
+whoChip.onclick=()=>whoM.classList.add('open');
+(function(){(typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).forEach(o=>{
+  const b=document.createElement('button');b.textContent=o.name;
+  b.style.borderColor=o.color;b.style.color=o.color;b.onclick=()=>setWho(o.name);
+  whoOpts.appendChild(b);});})();
+renderWho();
 histBtn.onclick=()=>{renderAct();actP.classList.add('open');};
 actX.onclick=()=>actP.classList.remove('open');
 initChips();
