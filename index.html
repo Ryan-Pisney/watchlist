@@ -58,6 +58,8 @@
   .abox h3{margin-bottom:12px}
   .abox input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 12px;font-size:15px;margin-bottom:10px;outline:none}
   .abox input:focus{border-color:var(--acc)}
+  .abox textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 12px;font-size:14px;margin-bottom:10px;outline:none;font-family:inherit;resize:vertical;min-height:70px}
+  .abox textarea:focus{border-color:var(--acc)}
   .arow{display:flex;gap:10px;margin-top:4px}
   .arow button{flex:1;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer}
   #aGo{background:var(--acc);color:#06240f}
@@ -124,7 +126,15 @@
 <div id="addM"><div class="abox"><h3>Add a movie</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
 <div id="actP"><div class="actH"><span>Recent activity</span><button id="actX">&times;</button></div><div id="actL"></div></div>
 <div id="whoM"><div class="abox"><h3>Who's watching?</h3><div id="whoOpts"></div></div></div>
-<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
+<div id="editM"><div class="abox"><h3>Edit movie</h3>
+<input id="eT" placeholder="Title" autocomplete="off">
+<input id="eY" placeholder="Year" inputmode="numeric">
+<input id="eG" placeholder="Genres, comma separated (e.g. Comedy, Horror)">
+<textarea id="eB" placeholder="Blurb (keep it spoiler-free)"></textarea>
+<input id="eL" placeholder="Letterboxd link (optional)">
+<div class="arow"><button id="eSave">Save</button><button id="eCancel">Cancel</button></div>
+<div id="eErr" style="color:#ff6b6b;font-size:13px;min-height:1.2em;margin-top:8px"></div></div></div>
+<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button><button class="rm" id="mEdit" style="border-color:#2b3a5a;color:#7fb2ff;margin-left:0">Edit details</button></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -251,6 +261,10 @@ function openModal(i,card){
   const mRm=document.getElementById('mRm');
   if(DB){mRm.style.display='inline-block';mRm.onclick=()=>{if(m.k)DB.ref('movies/'+m.k).remove();logAct('del',m[0],m[1]);modal.classList.remove('open');};}
   else mRm.style.display='none';
+  const mEdit=document.getElementById('mEdit');
+  if(DB&&m.k){mEdit.style.display='inline-block';mEdit.onclick=()=>openEditForm(m);}
+  else mEdit.style.display='none';
+  curI=i;curCard=card;
   const mp=document.getElementById('mPoster');
   const img=card.querySelector('img');
   mp.innerHTML='';
@@ -361,7 +375,7 @@ function renderAct(){
   if(!ACT.length){actL.innerHTML='<div class="act" style="color:var(--dim)">No activity yet.</div>';return;}
   for(const e of ACT){
     const row=document.createElement('div');row.className='act';
-    const ic=document.createElement('span');ic.className='ic '+(e.a==='add'?'plus':'minus');ic.textContent=e.a==='add'?'+':'−';
+    const ic=document.createElement('span');ic.className='ic '+(e.a==='add'?'plus':(e.a==='del'?'minus':''));ic.textContent=e.a==='add'?'+':(e.a==='del'?'−':'✎');
     const ti=document.createElement('span');ti.textContent=e.t+(e.y?' ('+e.y+')':'');
     if(e.actor){const ac=document.createElement('span');ac.textContent=' · '+e.actor;ac.style.color=whoColor(e.actor)||'var(--dim)';ti.appendChild(ac);}
     const wh=document.createElement('span');wh.className='when';
@@ -386,6 +400,38 @@ whoChip.onclick=()=>whoM.classList.add('open');
   b.style.borderColor=o.color;b.style.color=o.color;b.onclick=()=>setWho(o.name);
   whoOpts.appendChild(b);});})();
 renderWho();
+const editM=document.getElementById('editM');
+let curI=null,curCard=null;
+function openEditForm(m){
+  document.getElementById('eT').value=m[0];
+  document.getElementById('eY').value=m[1]||'';
+  document.getElementById('eG').value=(m[3]||[]).join(', ');
+  document.getElementById('eB').value=m[4]||'';
+  document.getElementById('eL').value=m[5]||'';
+  document.getElementById('eErr').textContent='';
+  editM.classList.add('open');
+}
+function saveEdit(refetch){
+  const m=M[curI];if(!m||!m.k)return;
+  const t=document.getElementById('eT').value.trim();
+  if(!t){document.getElementById('eErr').textContent='Title is required.';return;}
+  const y=parseInt(document.getElementById('eY').value,10)||'';
+  const g=document.getElementById('eG').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const b=document.getElementById('eB').value.trim();
+  const l=document.getElementById('eL').value.trim();
+  const k=m.k,u={};
+  u[k+'/t']=t;u[k+'/y']=y;u[k+'/g']=g;u[k+'/b']=b;
+  if(l)u[k+'/l']=l;
+  DB.ref('movies').update(u).then(()=>{
+    logAct('edit',t,y);
+    editM.classList.remove('open');
+    if(refetch)profileMovie(m.k,t,y);
+    setTimeout(()=>{if(curCard)openModal(curI,curCard);},400);
+  });
+}
+document.getElementById('eSave').onclick=()=>saveEdit(true);
+document.getElementById('eCancel').onclick=()=>editM.classList.remove('open');
+editM.onclick=e=>{if(e.target===editM)editM.classList.remove('open');};
 histBtn.onclick=()=>{renderAct();actP.classList.add('open');};
 actX.onclick=()=>actP.classList.remove('open');
 initChips();
