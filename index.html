@@ -318,7 +318,7 @@ function seedIfRequested(){
   });
 }
 let GENRE_MAP=null;
-async function profileMovie(k,t,y){
+async function profileMovie(k,t,y,keepL){
   const key=(typeof TMDB_API_KEY!=='undefined')?TMDB_API_KEY:'';
   if(!key||key==='PASTE_TMDB_KEY_HERE'||!DB||!k)return;
   try{
@@ -339,7 +339,7 @@ async function profileMovie(k,t,y){
         b=cut>80?b.slice(0,cut+1):b.slice(0,b.lastIndexOf(' '))+'…';}
       u[k+'/b']=b;}
     if(f.poster_path)u[k+'/pv']='https://image.tmdb.org/t/p/w500'+f.poster_path;
-    u[k+'/l']='https://letterboxd.com/search/'+encodeURIComponent(t);
+    if(!keepL)u[k+'/l']='https://letterboxd.com/search/'+encodeURIComponent(t);
     DB.ref('movies').update(u);
   }catch(e){}
 }
@@ -427,7 +427,7 @@ function saveEdit(refetch){
   DB.ref('movies').update(u).then(()=>{
     logAct('edit',t,y);
     editM.classList.remove('open');
-    if(refetch)profileMovie(m.k,t,y);
+    if(refetch&&(t!==m[0]||y!==m[1]))profileMovie(m.k,t,y,l);
     setTimeout(()=>{if(curCard)openModal(curI,curCard);},400);
   });
 }
