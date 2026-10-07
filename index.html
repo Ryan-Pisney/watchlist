@@ -66,7 +66,6 @@
   #cfgb{display:none;background:#2a2110;border:1px solid #6b5518;color:#e8c56b;font-size:13px;padding:10px 20px}
   .rm{display:inline-block;background:none;border:1px solid #5a2b2b;color:#ff8585;font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;margin-top:10px;margin-left:8px}
   #mWatch{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  #mWatchStatus{font-size:12px;color:var(--dim);margin-top:6px;min-height:1em}
   #histBtn{display:none;background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:8px 12px;font-size:14px;cursor:pointer}
   #histBtn:hover{border-color:var(--acc);color:var(--txt)}
   #actP{position:fixed;top:0;right:0;bottom:0;width:min(340px,92vw);background:var(--panel);border-left:1px solid var(--line);z-index:70;transform:translateX(105%);transition:transform .22s ease;display:flex;flex-direction:column}
@@ -125,7 +124,7 @@
 <div id="addM"><div class="abox"><h3>Add a movie</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
 <div id="actP"><div class="actH"><span>Recent activity</span><button id="actX">&times;</button></div><div id="actL"></div></div>
 <div id="whoM"><div class="abox"><h3>Who's watching?</h3><div id="whoOpts"></div></div></div>
-<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><div id="mWatchStatus"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
+<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -183,6 +182,7 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{
 async function loadPoster(i,img){
   const m=M[i];
   if(m[7]){img.onload=()=>img.classList.add('ok');img.src=m[7];return;}
+  if(m.pv){img.onload=()=>img.classList.add('ok');img.src=m.pv;return;}
   const cand=[];
   if(m[2])cand.push(m[2]);
   else cand.push(m[0]+' (film)',m[0]+' ('+m[1]+' film)',m[0]);
@@ -220,15 +220,10 @@ function renderWatch(m){
   const jw='https://www.justwatch.com/us/search?q='+encodeURIComponent(m[0]+(m[1]?' '+m[1]:''));
   let h='<a class="lb" href="'+jw+'" target="_blank" rel="noopener">Where to Watch &#8599;</a>';
   if(m.ia&&m.ia!=='none')h+='<a class="lb" style="background:#c98a2d;color:#211503" href="https://archive.org/details/'+m.ia+'" target="_blank" rel="noopener">&#9654; Watch free (Archive)</a>';
-  if(m.p&&m.p!=='none'&&m.p.flat&&m.p.flat.length)
-    h+='<div class="tags" style="margin-top:2px">'+m.p.flat.map(p=>'<span class="tag">'+esc(p)+'</span>').join('')+'</div>';
   w.innerHTML=h;
 }
-function watchStatus(msg){const el=document.getElementById('mWatchStatus');if(el)el.textContent=msg||'';}
 async function enrichWatch(m){
   if(!DB||!m.k)return;
-  const key=(typeof TMDB_API_KEY!=='undefined')?TMDB_API_KEY:'';
-  const canTmdb=key&&key!=='PASTE_TMDB_KEY_HERE';
   if(m[1]&&m[1]<1960&&m.ia===undefined){
     try{
       const q='https://archive.org/advancedsearch.php?q='+encodeURIComponent('title:"'+m[0]+'" AND mediatype:movies')+'&fl[]=identifier,title,year&rows=5&output=json';
@@ -239,26 +234,6 @@ async function enrichWatch(m){
       m.ia=hit?hit.identifier:'none';
       DB.ref('movies/'+m.k+'/ia').set(m.ia);
     }catch(e){}
-  }
-  const stale=m.p&&m.p.ts&&(Date.now()-m.p.ts>14*24*60*60*1000);
-  if(canTmdb&&(!m.p||stale)){
-    watchStatus('Checking streaming availability…');
-    try{
-      const r1=await fetch('https://api.themoviedb.org/3/search/movie?api_key='+key+'&query='+encodeURIComponent(m[0])+(m[1]?'&year='+m[1]:''));
-      if(!r1.ok)throw new Error('TMDB search HTTP '+r1.status);
-      const s=await r1.json();
-      const f=(s.results||[])[0];
-      if(f&&f.id){
-        const r2=await fetch('https://api.themoviedb.org/3/movie/'+f.id+'/watch/providers?api_key='+key);
-        if(!r2.ok)throw new Error('TMDB providers HTTP '+r2.status);
-        const pr=await r2.json();
-        const us=(pr.results&&pr.results.US)||{};
-        const flat=[...new Set([...(us.flatrate||[]),...(us.ads||[])].map(x=>x.provider_name))];
-        m.p={id:f.id,flat:flat,ts:Date.now()};
-      }else m.p={none:true,ts:Date.now()};
-      DB.ref('movies/'+m.k+'/p').set(m.p);
-      watchStatus(m.p.flat&&m.p.flat.length?'':'Found on TMDB — not on subscription streaming right now (rent/buy only)');
-    }catch(err){watchStatus('Lookup failed: '+((err&&err.message)||err)+' — tell Kimi this exact text');}
   }
   renderWatch(m);
 }
@@ -282,12 +257,7 @@ function openModal(i,card){
   if(img&&img.classList.contains('ok')){const c=img.cloneNode();c.className='ok';mp.appendChild(c)}
   else{const initials=m[0].split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();mp.innerHTML=`<div class="ph">${initials}</div>`;mp.style.background=`linear-gradient(145deg,hsl(${hue(m[0])} 45% 30%),hsl(${(hue(m[0])+50)%360} 55% 14%))`;loadPoster(i, Object.assign(mp.appendChild(document.createElement('img')),{}))}
   renderWatch(m);
-  if(DB&&m.k){
-    const key=(typeof TMDB_API_KEY!=='undefined')?TMDB_API_KEY:'';
-    const canTmdb=key&&key!=='PASTE_TMDB_KEY_HERE';
-    if(!canTmdb)watchStatus('TMDB key not detected — config.js looks stale');
-    if((m[1]&&m[1]<1960&&m.ia===undefined)||canTmdb)enrichWatch(m);
-  }else watchStatus('');
+  if(DB&&m.k&&m[1]&&m[1]<1960&&m.ia===undefined)enrichWatch(m);
   modal.classList.add('open');
 }
 document.getElementById('x').onclick=()=>modal.classList.remove('open');
@@ -307,7 +277,7 @@ function applySnap(v){
  try{
   const rows=[];let skipped=0;
   for(const k in v){const n=v[k];if(!n||typeof n.t!=='string'||!n.t.trim()){skipped++;continue;}
-    const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';r.p=n.p;r.ia=n.ia;rows.push(r);}
+    const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';r.p=n.p;r.ia=n.ia;r.pv=n.pv;rows.push(r);}
   M=rows.map(mergePoster);
   try{localStorage.setItem('wl-cache',JSON.stringify(M.map(r=>({t:r[0],y:r[1],w:r[2],g:r[3],b:r[4],l:r[5],d:r[6]}))));}catch(e){}
   initChips();render();
@@ -331,6 +301,32 @@ function seedIfRequested(){
     DB.ref('movies').update(u).then(()=>setBanner('Seeded '+SEED.length+' movies! You can drop ?seed=1 from the URL now.'));
   });
 }
+let GENRE_MAP=null;
+async function profileMovie(k,t,y){
+  const key=(typeof TMDB_API_KEY!=='undefined')?TMDB_API_KEY:'';
+  if(!key||key==='PASTE_TMDB_KEY_HERE'||!DB||!k)return;
+  try{
+    const s=await (await fetch('https://api.themoviedb.org/3/search/movie?api_key='+key+'&query='+encodeURIComponent(t)+(y?'&year='+y:''))).json();
+    const f=(s.results||[])[0];
+    if(!f)return;
+    if(!GENRE_MAP){
+      const gl=await (await fetch('https://api.themoviedb.org/3/genre/movie/list?api_key='+key)).json();
+      GENRE_MAP={};(gl.genres||[]).forEach(g=>GENRE_MAP[g.id]=g.name);
+    }
+    const u={};
+    if(f.release_date)u[k+'/y']=parseInt(String(f.release_date).slice(0,4),10);
+    const gnames=(f.genre_ids||[]).map(id=>GENRE_MAP[id]).filter(Boolean);
+    if(gnames.length)u[k+'/g']=gnames;
+    if(f.overview){let b=f.overview.trim();
+      if(b.length>320){b=b.slice(0,320);
+        const cut=Math.max(b.lastIndexOf('. '),b.lastIndexOf('! '),b.lastIndexOf('? '));
+        b=cut>80?b.slice(0,cut+1):b.slice(0,b.lastIndexOf(' '))+'…';}
+      u[k+'/b']=b;}
+    if(f.poster_path)u[k+'/pv']='https://image.tmdb.org/t/p/w500'+f.poster_path;
+    u[k+'/l']='https://letterboxd.com/search/'+encodeURIComponent(t);
+    DB.ref('movies').update(u);
+  }catch(e){}
+}
 const fab=document.getElementById('fab'),addM=document.getElementById('addM'),
       aT=document.getElementById('aT'),aY=document.getElementById('aY'),
       aGo=document.getElementById('aGo'),aNo=document.getElementById('aNo'),aErr=document.getElementById('aErr');
@@ -342,8 +338,9 @@ aGo.onclick=()=>{
   const t=aT.value.trim();
   if(!t){aErr.textContent='A title is required.';return;}
   const y=parseInt(aY.value,10)||'';
-  DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10),by:WHO||''});
+  const newRef=DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10),by:WHO||''});
   logAct('add',t,y);
+  profileMovie(newRef.key,t,y);
   aT.value='';aY.value='';aErr.textContent='';aClose();
 };
 let ACT=[];
