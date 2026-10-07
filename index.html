@@ -366,7 +366,7 @@ function logAct(a,t,y){
     DB.ref('activity').once('value',s=>{
       const v=s.val()||{};
       const ks=Object.keys(v).sort((x,z)=>(v[x].ts||0)-(v[z].ts||0));
-      if(ks.length>100){const drop={};ks.slice(0,ks.length-100).forEach(k=>drop[k]=null);DB.ref('activity').update(drop);}
+      if(ks.length>1000){const drop={};ks.slice(0,ks.length-1000).forEach(k=>drop[k]=null);DB.ref('activity').update(drop);}
     });
   });
 }
@@ -455,7 +455,7 @@ if(FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.apiKey!=='PASTE_API_KEY_HERE'){
     if(!loadLocal())render();
     setBanner('Could not reach the database — showing the last saved copy.');
   });
-  DB.ref('activity').on('value',s=>{const v=s.val()||{};ACT=Object.values(v).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,50);});
+  DB.ref('activity').on('value',s=>{const v=s.val()||{};ACT=Object.values(v).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,365);});
   seedIfRequested();
 }else{
   if(!loadLocal())render();
