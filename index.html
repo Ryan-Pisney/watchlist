@@ -424,10 +424,19 @@ function saveEdit(refetch){
   const k=m.k,u={};
   u[k+'/t']=t;u[k+'/y']=y;u[k+'/g']=g;u[k+'/b']=b;
   if(l)u[k+'/l']=l;
+  let qT=t,qY=y,doFetch=refetch&&(t!==m[0]||y!==m[1]);
+  const lm=l.match(/letterboxd\.com\/film\/([^/?#]+)/);
+  if(lm){
+    const parts=decodeURIComponent(lm[1]).replace(/\/+$/,'').split('-');
+    let sy='';
+    if(parts.length>1&&/^(19|20)\d{2}$/.test(parts[parts.length-1]))sy=parseInt(parts.pop(),10);
+    const st=parts.join(' ');
+    if(st){qT=st;qY=sy||y;doFetch=true;}
+  }
   DB.ref('movies').update(u).then(()=>{
     logAct('edit',t,y);
     editM.classList.remove('open');
-    if(refetch&&(t!==m[0]||y!==m[1]))profileMovie(m.k,t,y,l);
+    if(doFetch)profileMovie(m.k,qT,qY,l);
     setTimeout(()=>{if(curCard)openModal(curI,curCard);},400);
   });
 }
