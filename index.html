@@ -136,7 +136,7 @@
 <input id="eL" placeholder="Letterboxd link (optional)">
 <div class="arow"><button id="eSave">Save</button><button id="eCancel">Cancel</button></div>
 <div id="eErr" style="color:#ff6b6b;font-size:13px;min-height:1.2em;margin-top:8px"></div></div></div>
-<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button><button class="rm" id="mEdit" style="border-color:#2b3a5a;color:#7fb2ff;margin-left:0">Edit details</button></div></div></div>
+<div id="modal"><div class="box"><button id="x">&times;</button><div class="poster" id="mPoster"></div><div class="info"><h2 id="mTitle"></h2><div class="y" id="mYear"></div><div class="tags" id="mTags"></div><div class="y" id="mBy" style="margin-top:4px"></div><p id="mBlurb"></p><div id="mWatch"></div><a class="lb" id="mLb" target="_blank" rel="noopener">Open on Letterboxd &#8599;</a><a class="lb" id="mJf" style="background:#7c4dff;color:#fff;display:none" target="_blank" rel="noopener">&#9654; Watch in Jellyfin &#8599;</a><button class="rm" id="mRm">Remove from watchlist</button><button class="rm" id="mEdit" style="border-color:#2b3a5a;color:#7fb2ff;margin-left:0">Edit details</button></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -249,6 +249,26 @@ async function enrichWatch(m){
   }
   renderWatch(m);
 }
+async function linkJellyfin(m){
+  const a=document.getElementById('mJf');if(!a)return;
+  a.style.display='none';a.removeAttribute('href');
+  if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY)return;
+  try{
+    const users=await (await fetch(JELLYFIN_URL+'/Users?api_key='+JELLYFIN_API_KEY)).json();
+    if(!users||!users.length)return;
+    const uid=users[0].Id;
+    const j=await (await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10&api_key='+JELLYFIN_API_KEY)).json();
+    const items=(j&&j.Items)||[];
+    if(!items.length)return;
+    const norm=s=>String(s).replace(/[^a-z0-9]/gi,'').toLowerCase();
+    const want=norm(m[0]);
+    const hit=items.find(it=>norm(it.Name)===want&&m[1]&&String(it.ProductionYear||'')===String(m[1]))
+           ||items.find(it=>norm(it.Name)===want)
+           ||items[0];
+    a.href=JELLYFIN_URL+'/web/index.html#!/details?id='+hit.Id;
+    a.style.display='inline-block';
+  }catch(e){/* Jellyfin unreachable or misconfigured — button stays hidden */}
+}
 const modal=document.getElementById('modal');
 function openModal(i,card){
   const m=M[i];
@@ -273,6 +293,7 @@ function openModal(i,card){
   if(img&&img.classList.contains('ok')){const c=img.cloneNode();c.className='ok';mp.appendChild(c)}
   else{const initials=m[0].split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();mp.innerHTML=`<div class="ph">${initials}</div>`;mp.style.background=`linear-gradient(145deg,hsl(${hue(m[0])} 45% 30%),hsl(${(hue(m[0])+50)%360} 55% 14%))`;loadPoster(i, Object.assign(mp.appendChild(document.createElement('img')),{}))}
   renderWatch(m);
+  linkJellyfin(m);
   if(DB&&m.k&&m[1]&&m[1]<1960&&m.ia===undefined)enrichWatch(m);
   modal.classList.add('open');
 }
