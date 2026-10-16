@@ -253,11 +253,12 @@ async function linkJellyfin(m){
   const a=document.getElementById('mJf');if(!a)return;
   a.style.display='none';a.removeAttribute('href');
   if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY)return;
+  const H={'Authorization':'MediaBrowser Token="'+JELLYFIN_API_KEY+'"'};
   try{
-    const users=await (await fetch(JELLYFIN_URL+'/Users?api_key='+JELLYFIN_API_KEY)).json();
+    const users=await (await fetch(JELLYFIN_URL+'/Users',{headers:H})).json();
     if(!users||!users.length)return;
     const uid=users[0].Id;
-    const j=await (await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10&api_key='+JELLYFIN_API_KEY)).json();
+    const j=await (await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10',{headers:H})).json();
     const items=(j&&j.Items)||[];
     if(!items.length)return;
     const norm=s=>String(s).replace(/[^a-z0-9]/gi,'').toLowerCase();
