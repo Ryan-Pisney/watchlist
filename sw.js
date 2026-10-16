@@ -1,4 +1,4 @@
-const CACHE = 'watchlist-v3';
+const CACHE = 'watchlist-v4';
 const SHELL = ['./index.html', './manifest.json', './config.js', './posters.js', './seed.js',
                './icon-192.png', './icon-512.png', './icon-180.png'];
 // small, occasionally-edited files: always fetch fresh, cache as backup
@@ -42,21 +42,9 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
 
-  if (url.origin !== location.origin) {
-    e.respondWith(
-      caches.match(e.request).then(hit =>
-        hit ||
-        fetch(e.request).then(res => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, copy));
-          }
-          return res;
-        })
-      )
-    );
-    return;
-  }
+  // Cross-origin requests (Jellyfin API, TMDB, etc.): bypass the service worker entirely.
+  // Wrapping these (especially requests with Authorization headers) breaks CORS preflights.
+  if (url.origin !== location.origin) return;
 
   const isFresh = FRESH.some(f => url.pathname.endsWith(f.replace('./', '/')));
   e.respondWith(e.request.mode === 'navigate' || isFresh ? networkFirst(e.request) : cacheFirst(e.request));
