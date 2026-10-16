@@ -21,4 +21,4 @@ const TMDB_API_KEY = "61d1809374ec7d216da43046aa3b14d0";
 
 // Jellyfin integration — "Watch in Jellyfin" button on each movie
 const JELLYFIN_URL = "https://msi.tail51b9a9.ts.net";
-const JELLYFIN_API_KEY = "491470e65a8a4412a35867bc7de8390f";
+const JELLYFIN_API_KEY = "02749172460b48b08759e825c10644da";
