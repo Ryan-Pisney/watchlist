@@ -266,7 +266,7 @@ async function linkJellyfin(m){
     const hit=items.find(it=>norm(it.Name)===want&&m[1]&&String(it.ProductionYear||'')===String(m[1]))
            ||items.find(it=>norm(it.Name)===want)
            ||items[0];
-    a.href=JELLYFIN_URL+'/web/index.html#!/details?id='+hit.Id;
+    a.href=JELLYFIN_URL+'/web/index.html#!/video?itemId='+hit.Id+(hit.ServerId?'&serverId='+hit.ServerId:'');
     a.style.display='inline-block';
   }catch(e){/* Jellyfin unreachable or misconfigured — button stays hidden */}
 }
