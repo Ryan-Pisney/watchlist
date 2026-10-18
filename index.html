@@ -277,6 +277,21 @@ async function linkJellyfin(m){
     a.style.display='inline-block';
   }
 }
+// Minimal self-contained toast (styling inline — no CSS file dependency)
+function toast(msg){
+  let t=document.getElementById('jf-toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='jf-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#7c4dff;color:#fff;padding:11px 20px;border-radius:10px;font:600 14px/1.4 system-ui,sans-serif;z-index:99;opacity:0;transition:opacity .25s,transform .25s;box-shadow:0 6px 20px rgba(0,0,0,.5);max-width:88vw;text-align:center;pointer-events:none';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});
+  clearTimeout(t._h);
+  t._h=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2800);
+}
+
 // Click handler: explain why there's no link yet instead of doing nothing
 (function(){
   const a=document.getElementById('mJf');if(!a)return;
