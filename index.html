@@ -251,16 +251,19 @@ async function enrichWatch(m){
 }
 async function linkJellyfin(m){
   const a=document.getElementById('mJf');if(!a)return;
-  a.style.display='none';a.removeAttribute('href');
+  a.style.display='none';a.removeAttribute('href');delete a.dataset.err;
   if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY)return;
   const H={'Authorization':'MediaBrowser Token="'+JELLYFIN_API_KEY+'"'};
   try{
-    const users=await (await fetch(JELLYFIN_URL+'/Users',{headers:H})).json();
+    const ur=await fetch(JELLYFIN_URL+'/Users',{headers:H});
+    if(!ur.ok)throw String(ur.status);
+    const users=await ur.json();
     if(!users||!users.length)return;
     const uid=users[0].Id;
-    const j=await (await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10',{headers:H})).json();
-    const items=(j&&j.Items)||[];
-    if(!items.length)return;
+    const ir=await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10',{headers:H});
+    if(!ir.ok)throw String(ir.status);
+    const items=(await ir.json()).Items||[];
+    if(!items.length)return; // genuinely not in the library — stays hidden by design
     const norm=s=>String(s).replace(/[^a-z0-9]/gi,'').toLowerCase();
     const want=norm(m[0]);
     const hit=items.find(it=>norm(it.Name)===want&&m[1]&&String(it.ProductionYear||'')===String(m[1]))
@@ -268,7 +271,23 @@ async function linkJellyfin(m){
            ||items[0];
     a.href=JELLYFIN_URL+'/web/index.html#!/details?id='+hit.Id;
     a.style.display='inline-block';
-  }catch(e){/* Jellyfin unreachable or misconfigured — button stays hidden */}
+  }catch(err){
+    // Unreachable (Tailscale off/server down) or key rejected — show hint button
+    a.dataset.err=(typeof err==='string'&&err)||'net';
+    a.style.display='inline-block';
+  }
+}
+// Click handler: explain why there's no link yet instead of doing nothing
+(function(){
+  const a=document.getElementById('mJf');if(!a)return;
+  a.addEventListener('click',e=>{
+    if(a.getAttribute('href'))return;
+    e.preventDefault();
+    toast(a.dataset.err==='401'
+      ?'Jellyfin rejected the API key — check config.js'
+      :"Can't reach Jellyfin — is Tailscale connected?");
+  });
+})();
 }
 const modal=document.getElementById('modal');
 function openModal(i,card){

@@ -1,8 +1,6 @@
-const CACHE = 'watchlist-v4';
+const CACHE = 'watchlist-v5';
 const SHELL = ['./index.html', './manifest.json', './config.js', './posters.js', './seed.js',
                './icon-192.png', './icon-512.png', './icon-180.png'];
-// small, occasionally-edited files: always fetch fresh, cache as backup
-const FRESH = ['./config.js', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,36 +14,22 @@ self.addEventListener('activate', e => {
   );
 });
 
-function networkFirst(req) {
-  return fetch(req)
-    .then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(req, copy));
-      return res;
-    })
-    .catch(() => caches.match(req).then(m => m || caches.match('./index.html')));
-}
-
-function cacheFirst(req) {
-  return caches.match(req).then(
-    hit =>
-      hit ||
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      })
-  );
-}
-
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
 
   // Cross-origin requests (Jellyfin API, TMDB, etc.): bypass the service worker entirely.
-  // Wrapping these (especially requests with Authorization headers) breaks CORS preflights.
   if (url.origin !== location.origin) return;
 
-  const isFresh = FRESH.some(f => url.pathname.endsWith(f.replace('./', '/')));
-  e.respondWith(e.request.mode === 'navigate' || isFresh ? networkFirst(e.request) : cacheFirst(e.request));
+  // Network-first for EVERYTHING: always try for the newest file,
+  // fall back to cache only when offline.
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(m => m || (e.request.mode === 'navigate' ? caches.match('./index.html') : m)))
+  );
 });
