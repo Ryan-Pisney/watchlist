@@ -125,12 +125,13 @@
 <main id="grid"></main>
 <footer>Posters stream from Wikipedia as you scroll (internet required). Blurbs &amp; filters work offline.</footer>
 <button id="fab" title="Add a movie">+</button>
-<div id="addM"><div class="abox"><h3>Add a movie</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
+<div id="addM"><div class="abox"><h3>Add a title</h3><input id="aT" placeholder="Title" autocomplete="off"><input id="aY" placeholder="Year (optional)" inputmode="numeric"><select id="aTy" style="width:100%;margin-bottom:10px;font:inherit"><option value="movie">Movie</option><option value="show">TV Show</option></select><div class="arow"><button id="aGo">Add to watchlist</button><button id="aNo">Cancel</button></div><div id="aErr"></div></div></div>
 <div id="actP"><div class="actH"><span>Recent activity</span><button id="actX">&times;</button></div><div id="actL"></div></div>
 <div id="whoM"><div class="abox"><h3>Who's watching?</h3><div id="whoOpts"></div></div></div>
-<div id="editM"><div class="abox"><h3>Edit movie</h3>
+<div id="editM"><div class="abox"><h3>Edit title</h3>
 <input id="eT" placeholder="Title" autocomplete="off">
 <input id="eY" placeholder="Year" inputmode="numeric">
+<select id="eTy" style="width:100%;margin-bottom:10px;font:inherit"><option value="movie">Movie</option><option value="show">TV Show</option></select>
 <input id="eG" placeholder="Genres, comma separated (e.g. Comedy, Horror)">
 <textarea id="eB" placeholder="Blurb (keep it spoiler-free)"></textarea>
 <input id="eL" placeholder="Letterboxd link (optional)">
@@ -260,7 +261,7 @@ async function linkJellyfin(m){
     const users=await ur.json();
     if(!users||!users.length)return;
     const uid=users[0].Id;
-    const ir=await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes=Movie,Series&Recursive=true&Limit=10',{headers:H});
+    const ir=await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes='+(m.ty==='show'?'Series':'Movie,Series')+'&Recursive=true&Limit=10',{headers:H});
     if(!ir.ok)throw String(ir.status);
     const items=(await ir.json()).Items||[];
     if(!items.length)return; // genuinely not in the library — stays hidden by design
@@ -308,7 +309,7 @@ function openModal(i,card){
   const m=M[i];
   document.getElementById('mTitle').textContent=m[0];
   document.getElementById('mYear').textContent=(m[1]?m[1]+' · ':'')+(m[6]?'added '+m[6]:'');
-  document.getElementById('mTags').innerHTML=m[3].map(g=>`<span class="tag">${esc(g)}</span>`).join('');
+  document.getElementById('mTags').innerHTML=(m.ty==='show'?`<span class="tag" style="background:#7c4dff;color:#fff">TV SHOW</span>`:'')+m[3].map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const mBy=document.getElementById('mBy'),mc=whoColor(m.by);
   mBy.textContent=m.by?('Added by '+m.by):'';
   mBy.style.color=mc||'var(--dim)';
@@ -348,7 +349,7 @@ function applySnap(v){
  try{
   const rows=[];let skipped=0;
   for(const k in v){const n=v[k];if(!n||typeof n.t!=='string'||!n.t.trim()){skipped++;continue;}
-    const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';r.p=n.p;r.ia=n.ia;r.pv=n.pv;rows.push(r);}
+    const r=[n.t,n.y,n.w||'',n.g||[],n.b||'',n.l||'',n.d||'',''];r.k=k;r.by=n.by||'';r.p=n.p;r.ia=n.ia;r.pv=n.pv;r.ty=n.ty||'movie';rows.push(r);}
   M=rows.map(mergePoster);
   try{localStorage.setItem('wl-cache',JSON.stringify(M.map(r=>({t:r[0],y:r[1],w:r[2],g:r[3],b:r[4],l:r[5],d:r[6]}))));}catch(e){}
   initChips();render();
@@ -409,7 +410,7 @@ aGo.onclick=()=>{
   const t=aT.value.trim();
   if(!t){aErr.textContent='A title is required.';return;}
   const y=parseInt(aY.value,10)||'';
-  const newRef=DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10),by:WHO||''});
+  const newRef=DB.ref('movies').push({t:t,y:y,w:'',g:[],b:'',l:'',d:new Date().toISOString().slice(0,10),by:WHO||'',ty:(document.getElementById('aTy')||{}).value||'movie'});
   logAct('add',t,y);
   profileMovie(newRef.key,t,y);
   aT.value='';aY.value='';aErr.textContent='';aClose();
@@ -465,6 +466,7 @@ function openEditForm(m){
   document.getElementById('eG').value=(m[3]||[]).join(', ');
   document.getElementById('eB').value=m[4]||'';
   document.getElementById('eL').value=m[5]||'';
+  document.getElementById('eTy').value=m.ty||'movie';
   document.getElementById('eErr').textContent='';
   editM.classList.add('open');
 }
@@ -476,9 +478,11 @@ function saveEdit(refetch){
   const g=document.getElementById('eG').value.split(',').map(s=>s.trim()).filter(Boolean);
   const b=document.getElementById('eB').value.trim();
   const l=document.getElementById('eL').value.trim();
+  const ty=document.getElementById('eTy').value;
   const k=m.k,u={};
   u[k+'/t']=t;u[k+'/y']=y;u[k+'/g']=g;u[k+'/b']=b;
   if(l)u[k+'/l']=l;
+  u[k+'/ty']=ty;
   let qT=t,qY=y,doFetch=refetch&&(t!==m[0]||y!==m[1]);
   const lm=l.match(/letterboxd\.com\/film\/([^/?#]+)/);
   if(lm){
