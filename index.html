@@ -108,6 +108,7 @@
     <input type="search" id="q" placeholder="Search titles…">
     <select id="sort">
       <option value="title">Title A–Z</option>
+      <option value="za">Title Z–A</option>
       <option value="new">Year: newest first</option>
       <option value="old">Year: oldest first</option>
       <option value="added">Recently added</option>
@@ -117,6 +118,7 @@
       <option value="compact">Small cards</option>
     </select>
     <button id="histBtn" title="Recent activity">History</button>
+    <button id="jfBtn" title="Scan all titles against Jellyfin" style="display:none">Jellyfin</button>
     <button id="whoChip" title="Switch user"></button>
   </div>
 </header>
@@ -152,6 +154,10 @@ let M=[];
 const grid=document.getElementById('grid'),chipsEl=document.getElementById('chips'),q=document.getElementById('q'),sortSel=document.getElementById('sort');
 let activeGenres=new Set();
 let activeActor=null;
+let onlyMissing=false;
+let JF_STATUS={};try{JF_STATUS=JSON.parse(localStorage.getItem('wl-jf')||'{}')}catch(e){}
+function jfKey(m){return m[0]+'|'+(m[1]||'')+'|'+(m.ty||'movie')}
+function saveJf(){try{localStorage.setItem('wl-jf',JSON.stringify(JF_STATUS))}catch(e){}}
 const art=t=>t.replace(/^(the|a|an)\s+/i,'');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hue=t=>{let h=0;for(const c of t)h=(h*31+c.charCodeAt(0))%360;return h};
@@ -161,6 +167,9 @@ function initChips(){
   const genres=[...new Set(M.flatMap(m=>m[3]))].sort();
   const all=document.createElement('span');all.className='chip on';all.textContent='All';all.onclick=()=>{activeGenres.clear();activeActor=null;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));all.classList.add('on');render()};
   chipsEl.appendChild(all);
+  const jfc=document.createElement('span');jfc.className='chip';jfc.textContent='Needs Jellyfin';
+  jfc.onclick=()=>{onlyMissing=!onlyMissing;jfc.classList.toggle('on',onlyMissing);render()};
+  chipsEl.appendChild(jfc);
   if(M.some(m=>m.by))(typeof WHO_OPTIONS!=='undefined'?WHO_OPTIONS:[]).forEach(o=>{
     const c=document.createElement('span');c.className='chip who';c.textContent=o.name;
     c.style.borderColor=o.color;c.style.color=o.color;
@@ -180,11 +189,12 @@ function initChips(){
 }
 function visible(){
   const term=q.value.trim().toLowerCase();
-  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeActor||m.by===activeActor)&&(!activeGenres.size||[...activeGenres].every(g=>m[3].includes(g))));
+  return M.filter(m=>(!term||m[0].toLowerCase().includes(term))&&(!activeActor||m.by===activeActor)&&(!onlyMissing||JF_STATUS[jfKey(m)]==='n')&&(!activeGenres.size||[...activeGenres].every(g=>m[3].includes(g))));
 }
 function sorted(list){
   const s=sortSel.value;
   if(s==='title')return [...list].sort((a,b)=>art(a[0]).localeCompare(art(b[0])));
+  if(s==='za')return [...list].sort((a,b)=>art(b[0]).localeCompare(art(a[0])));
   if(s==='new')return [...list].sort((a,b)=>(b[1]||0)-(a[1]||0));
   if(s==='old')return [...list].sort((a,b)=>(a[1]||0)-(b[1]||0));
   return [...list].sort((a,b)=>b[6].localeCompare(a[6]));
@@ -227,6 +237,7 @@ function render(){
     grid.appendChild(card);
     io.observe(card);
   });
+  jfUpdate();
 }
 function renderWatch(m){
   const w=document.getElementById('mWatch');if(!w)return;
@@ -264,12 +275,13 @@ async function linkJellyfin(m){
     const ir=await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes='+(m.ty==='show'?'Series':'Movie,Series')+'&Recursive=true&Limit=10',{headers:H});
     if(!ir.ok)throw String(ir.status);
     const items=(await ir.json()).Items||[];
-    if(!items.length)return; // genuinely not in the library — stays hidden by design
+    if(!items.length){JF_STATUS[jfKey(m)]='n';saveJf();return;}
     const norm=s=>String(s).replace(/[^a-z0-9]/gi,'').toLowerCase();
     const want=norm(m[0]);
     const hit=items.find(it=>norm(it.Name)===want&&m[1]&&String(it.ProductionYear||'')===String(m[1]))
            ||items.find(it=>norm(it.Name)===want)
            ||items[0];
+    JF_STATUS[jfKey(m)]='y';saveJf();
     a.href=JELLYFIN_URL+'/web/index.html#!/details?id='+hit.Id;
     a.style.display='inline-block';
   }catch(err){
@@ -293,6 +305,38 @@ function toast(msg){
   t._h=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2800);
 }
 
+let jfBusy=false;
+async function jfScan(){
+  if(jfBusy)return;
+  if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY){toast('Jellyfin not configured — check config.js');return;}
+  jfBusy=true;
+  const btn=document.getElementById('jfBtn');
+  const H={'Authorization':'MediaBrowser Token="'+JELLYFIN_API_KEY+'"'};
+  try{
+    const users=await (await fetch(JELLYFIN_URL+'/Users',{headers:H})).json();
+    const uid=users[0].Id;
+    let done=0;
+    for(const m of M){
+      try{
+        const types=(m.ty==='show')?'Series':'Movie,Series';
+        const r=await fetch(JELLYFIN_URL+'/Users/'+uid+'/Items?searchTerm='+encodeURIComponent(m[0])+'&IncludeItemTypes='+types+'&Recursive=true&Limit=10',{headers:H});
+        const items=(await r.json()).Items||[];
+        JF_STATUS[jfKey(m)]=items.length?'y':'n';
+      }catch(e){JF_STATUS[jfKey(m)]='n';}
+      done++;btn.textContent='Jellyfin '+done+'/'+M.length;
+    }
+    saveJf();
+  }catch(e){toast('Jellyfin scan failed — is Tailscale connected?');}
+  jfBusy=false;jfUpdate();render();
+}
+function jfMissing(){return M.filter(m=>JF_STATUS[jfKey(m)]==='n')}
+function jfUpdate(){
+  const btn=document.getElementById('jfBtn');
+  if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY){btn.style.display='none';return;}
+  btn.style.display='block';
+  const y=M.filter(m=>JF_STATUS[jfKey(m)]==='y').length,n=jfMissing().length;
+  btn.textContent=jfBusy?'Jellyfin…':('Jellyfin \u2713'+y+' \u2717'+n);
+}
 // Click handler: explain why there's no link yet instead of doing nothing
 (function(){
   const a=document.getElementById('mJf');if(!a)return;
@@ -335,7 +379,9 @@ function openModal(i,card){
 document.getElementById('x').onclick=()=>modal.classList.remove('open');
 modal.onclick=e=>{if(e.target===modal)modal.classList.remove('open')};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')modal.classList.remove('open')});
-q.oninput=render;sortSel.onchange=render;
+q.oninput=render;
+sortSel.onchange=()=>{try{localStorage.setItem('wl-sort',sortSel.value)}catch(e){}render()};
+try{const sv=localStorage.getItem('wl-sort');if(sv)sortSel.value=sv;}catch(e){}
 const sizeSel=document.getElementById('size');
 function applyDensity(v){document.body.classList.toggle('compact',v==='compact');sizeSel.value=v;try{localStorage.setItem('wl-density',v)}catch(e){}}
 sizeSel.onchange=()=>applyDensity(sizeSel.value);
@@ -503,6 +549,7 @@ document.getElementById('eSave').onclick=()=>saveEdit(true);
 document.getElementById('eCancel').onclick=()=>editM.classList.remove('open');
 editM.onclick=e=>{if(e.target===editM)editM.classList.remove('open');};
 histBtn.onclick=()=>{renderAct();actP.classList.add('open');};
+document.getElementById('jfBtn').onclick=jfScan;
 actX.onclick=()=>actP.classList.remove('open');
 initChips();
 if(FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.apiKey!=='PASTE_API_KEY_HERE'){
