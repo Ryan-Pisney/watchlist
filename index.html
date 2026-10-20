@@ -118,7 +118,14 @@
       <option value="compact">Small cards</option>
     </select>
     <button id="histBtn" title="Recent activity">History</button>
-    <button id="jfBtn" title="Scan all titles against Jellyfin" style="display:none">Jellyfin</button>
+    <button id="jfBtn" title="Scan all titles against Jellyfin" style="display:none;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 12px;font-size:13.5px;cursor:pointer" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--line)'">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+        <path d="M5 11a7 6.5 0 0 1 14 0c0 1-.3 1.7-.9 2.3.9.5 1.9 1.2 1.9 2.4 0 1.5-1.3 2.6-3.1 2.6H7.1C5.3 18.3 4 17.2 4 15.7c0-1.2 1-1.9 1.9-2.4-.6-.6-.9-1.3-.9-2.3z" fill="url(#jfG)"/>
+        <path d="M8.5 18.5v3M12 18.5v4M15.5 18.5v3" stroke="url(#jfG)" stroke-width="1.3" stroke-linecap="round"/>
+        <defs><linearGradient id="jfG" x1="4" y1="4" x2="20" y2="22"><stop stop-color="#9ec1ff"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs>
+      </svg>
+      <span id="jfTxt" style="font-weight:600">Jellyfin</span>
+    </button>
     <button id="whoChip" title="Switch user"></button>
   </div>
 </header>
@@ -326,7 +333,7 @@ async function jfScan(){
         const items=(await r.json()).Items||[];
         JF_STATUS[jfKey(m)]=items.length?'y':'n';
       }catch(e){JF_STATUS[jfKey(m)]='n';}
-      done++;btn.textContent='Jellyfin '+done+'/'+M.length;
+      done++;const tt=document.getElementById('jfTxt');if(tt)tt.textContent=done+'/'+M.length;
     }
     saveJf();
   }catch(e){toast('Jellyfin scan failed — is Tailscale connected?');}
@@ -338,7 +345,8 @@ function jfUpdate(){
   if(typeof JELLYFIN_URL==='undefined'||typeof JELLYFIN_API_KEY==='undefined'||!JELLYFIN_API_KEY){btn.style.display='none';return;}
   btn.style.display='block';
   const y=M.filter(m=>JF_STATUS[jfKey(m)]==='y').length,n=jfMissing().length;
-  btn.textContent=jfBusy?'Jellyfin…':('Jellyfin \u2713'+y+' \u2717'+n);
+  const t=document.getElementById('jfTxt');
+  if(t){if(jfBusy){t.textContent='\u2026';}else{t.innerHTML='<span style="color:#00e054">\u2713'+y+'</span> <span style="color:#ff8585">\u2717'+n+'</span>';}}
 }
 // Click handler: explain why there's no link yet instead of doing nothing
 (function(){
