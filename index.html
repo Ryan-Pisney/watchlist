@@ -289,8 +289,8 @@ async function linkJellyfin(m){
     const norm=s=>String(s).replace(/[^a-z0-9]/gi,'').toLowerCase();
     const want=norm(m[0]);
     const hit=items.find(it=>norm(it.Name)===want&&m[1]&&String(it.ProductionYear||'')===String(m[1]))
-           ||items.find(it=>norm(it.Name)===want)
-           ||items[0];
+           ||items.find(it=>norm(it.Name)===want);
+    if(!hit){JF_STATUS[jfKey(m)]='n';saveJf();return;}
     JF_STATUS[jfKey(m)]='y';saveJf();
     a.href=JELLYFIN_URL+'/web/index.html#!/details?id='+hit.Id;
     a.style.display='inline-block';
